@@ -8,28 +8,32 @@ import 'package:weather_example/widgets/temp_view.dart';
 import 'package:flutter/material.dart';
 
 class WeatherForecastScreen extends StatefulWidget {
-  final locationWeather;
-  WeatherForecastScreen({this.locationWeather});
+  final WeatherForecast? locationWeather;
+
+  const WeatherForecastScreen({super.key, this.locationWeather});
 
   @override
-  _WeatherForecastScreenState createState() => _WeatherForecastScreenState();
+  State<WeatherForecastScreen> createState() => _WeatherForecastScreenState();
 }
 
 class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
-  Future<WeatherForecast> forecastObject;
-  String _cityName;
+  late Future<WeatherForecast> forecastObject;
+  String _cityName = '';
 
   @override
   void initState() {
     super.initState();
 
+    // Егер бастапқы ауа райы берілсе, соны көрсетеміз.
     if (widget.locationWeather != null) {
-      forecastObject = Future.value(widget.locationWeather);
+      forecastObject = Future.value(widget.locationWeather!);
+    } else {
+      // Бастапқыда телефонның орналасқан жеріндегі ауа райын аламыз.
+      forecastObject = WeatherApi().fetchWeatherForecast(
+        city: '',
+        isCity: false,
+      );
     }
-
-    // forecastObject.then((weather) {
-    //   print(weather.list[0].weather[0].main);
-    // });
   }
 
   @override
@@ -37,30 +41,41 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black87,
-        title: Text('Weather forecast'),
+        title: const Text('Weather forecast'),
         centerTitle: true,
         automaticallyImplyLeading: false,
         leading: IconButton(
-          icon: Icon(Icons.my_location),
+          icon: const Icon(Icons.my_location),
           onPressed: () {
             setState(() {
-              forecastObject = WeatherApi().fetchWeatherForecast();
+              // Қайтадан қазіргі орналасқан жердің ауа райын аламыз.
+              forecastObject = WeatherApi().fetchWeatherForecast(
+                city: '',
+                isCity: false,
+              );
             });
           },
         ),
         actions: <Widget>[
           IconButton(
-            icon: Icon(Icons.location_city),
+            icon: const Icon(Icons.location_city),
             onPressed: () async {
-              var tappedName = await Navigator.push(context,
-                  MaterialPageRoute(builder: (context) {
-                return CityScreen();
-              }));
-              if (tappedName != null) {
+              final tappedName = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CityScreen(),
+                ),
+              );
+
+              if (tappedName != null && tappedName.trim().isNotEmpty) {
                 setState(() {
-                  _cityName = tappedName;
-                  forecastObject = WeatherApi()
-                      .fetchWeatherForecast(city: _cityName, isCity: true);
+                  _cityName = tappedName.trim();
+
+                  // Енгізілген қаланың ауа райын аламыз.
+                  forecastObject = WeatherApi().fetchWeatherForecast(
+                    city: _cityName,
+                    isCity: true,
+                  );
                 });
               }
             },
@@ -69,34 +84,44 @@ class _WeatherForecastScreenState extends State<WeatherForecastScreen> {
       ),
       body: ListView(
         children: <Widget>[
-          Container(
-            child: FutureBuilder<WeatherForecast>(
-              future: forecastObject,
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  return Column(
-                    children: <Widget>[
-                      SizedBox(height: 50.0),
-                      CityView(snapshot: snapshot),
-                      SizedBox(height: 50.0),
-                      TempView(snapshot: snapshot),
-                      SizedBox(height: 50.0),
-                      DetailView(snapshot: snapshot),
-                      SizedBox(height: 50.0),
-                      BottomListView(snapshot: snapshot),
-                    ],
-                  );
-                } else {
-                  return Center(
-                    child: Text(
-                      'City not found\nPlease, enter correct city',
-                      style: TextStyle(fontSize: 25),
-                      textAlign: TextAlign.center,
-                    ),
-                  );
-                }
-              },
-            ),
+          FutureBuilder<WeatherForecast>(
+            future: forecastObject,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.all(40.0),
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
+              if (snapshot.hasData) {
+                return Column(
+                  children: <Widget>[
+                    const SizedBox(height: 50.0),
+                    CityView(snapshot: snapshot),
+                    const SizedBox(height: 50.0),
+                    TempView(snapshot: snapshot),
+                    const SizedBox(height: 50.0),
+                    DetailView(snapshot: snapshot),
+                    const SizedBox(height: 50.0),
+                    BottomListView(snapshot: snapshot),
+                  ],
+                );
+              }
+
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Text(
+                    'City not found\nPlease, enter correct city',
+                    style: TextStyle(fontSize: 25),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
